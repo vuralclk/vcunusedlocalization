@@ -150,7 +150,7 @@ final class FileScanner: FileScanning {
                 let visitor = StringLiteralVisitor(viewMode: .sourceAccurate)
                 visitor.walk(sourceFile)                
                 stringLiterals.formUnion(visitor.stringLiterals)
-                
+
                 // Kalan süreyi hesapla
                 let currentTime = Date()
                 let elapsedTime = currentTime.timeIntervalSince(lastUpdateTime)
@@ -264,59 +264,41 @@ final class LocalizationParser: LocalizationParsing {
     }()
     private let progressTracker: ProgressTracking
 
-    init(
-        progressTracker: ProgressTracking
-    ) {
+    init(progressTracker: ProgressTracking) {
         self.progressTracker = progressTracker
     }
 
     func parseStringsFile(at url: URL) throws -> Set<LocalizationKey> {
-        var content: String? = nil
-        let encodings: [String.Encoding] = [
-            .utf8,
-            .utf16,
-            .utf16BigEndian,
-            .utf16LittleEndian
-        ]
-
-        for encoding in encodings {
-            if let fileContent = try? String(contentsOf: url, encoding: encoding) {
-                content = fileContent
-                break
-            }
-        }
+        print("\n📄 Dosya analiz ediliyor: \(url.lastPathComponent)")
         
-        guard let content = content else {
-            print("Could not read file: \(url.lastPathComponent)")
-            throw NSError(domain: "LocalizationParser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not read file: \(url.lastPathComponent)"])
-        }
-        
-        print("\n📄 Analyzing file: \(url.lastPathComponent)")
-        
-        let range = NSRange(location: 0, length: content.utf16.count)
-        let matches = keyPattern.matches(in: content, options: [], range: range)
-        
-        var localizationKeys = Set<LocalizationKey>()
-
-        for (index, match) in matches.enumerated() {
-            progressTracker.updateProgress(index + 1, total: matches.count, step: "Analyzing file")
+        if let data = try? Data(contentsOf: url),
+           let content = String(data: data, encoding: .utf8),
+           let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String] {
+            print("✅ Dosya dictionary olarak başarıyla okundu")
+            var localizationKeys = Set<LocalizationKey>()
             
-            if let keyRange = Range(match.range(at: 1), in: content) {
-                let key = String(content[keyRange])
-                let lineNumber = content.prefix(through: content.index(content.startIndex, offsetBy: match.range.location))
-                    .components(separatedBy: .newlines)
-                    .count
+            let total = dict.count
+            for (index, (key, _)) in dict.enumerated() {
+                progressTracker.updateProgress(index + 1, total: total, step: "Dosya analiz ediliyor")
                 
                 localizationKeys.insert(LocalizationKey(
                     key: key,
                     file: url.lastPathComponent,
-                    lineNumber: lineNumber,
+                    lineNumber: 0,
                     isUsed: false
                 ))
             }
+            
+            return localizationKeys
+        } else {
+            throw NSError(
+                domain: "LocalizationParserError",
+                code: 1001,
+                userInfo: [
+                    NSLocalizedDescriptionKey: "Strings dosyası okunamadı: \(url.lastPathComponent). Dosya formatı geçerli değil veya bozuk olabilir."
+                ]
+            )
         }
-        
-        return localizationKeys
     }
 }
 
