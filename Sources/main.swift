@@ -139,55 +139,104 @@ final class FileScanner: FileScanning {
         var combinedSwiftContent = ""
         let totalFiles = swiftFileUrls.count
         var currentFile = 0
+        
+        let fileGroup = DispatchGroup()
+        let fileQueue = DispatchQueue(
+            label: "com.fileScanner.fileQueue",
+            qos: .userInitiated,
+            attributes: .concurrent
+        )
+        let combinedSwiftContentQueue = DispatchQueue(
+            label: "com.fileScanner.combinedSwiftContentQueue",
+            qos: .userInitiated,
+            attributes: .concurrent
+        )
+        let swiftFileUrlsPrintQueue = DispatchQueue(
+            label: "com.fileScanner.swiftFileUrlsPrintQueue",
+            qos: .userInitiated
+        )
 
         for fileURL in swiftFileUrls {
-            currentFile += 1
-            do {
-                let content = try String(contentsOf: fileURL, encoding: .utf8)
-                combinedSwiftContent += content.lowercased()
-            } catch {
-                print("\n⚠️ Could not read file: \(fileURL.lastPathComponent)")
+            fileGroup.enter()
+            fileQueue.async {
+                swiftFileUrlsPrintQueue.sync {
+                    currentFile += 1
+
+                    let fileProgress = currentFile > 0 ? Double(currentFile) / Double(totalFiles) : 0
+                    let fileElapsedTime = Date().timeIntervalSince(startTime)
+
+                    let fileEstimatedTotalTime = fileProgress > 0 ? fileElapsedTime / fileProgress : 0
+                    let fileRemainingTime = max(0, fileEstimatedTotalTime - fileElapsedTime)
+                    let fileEstimatedEndTime = Date(timeIntervalSinceNow: fileRemainingTime)
+
+                    let fileRemainingMinutes = Int(floor(fileRemainingTime / 60))
+                    let fileRemainingSeconds = Int(floor(fileRemainingTime.truncatingRemainder(dividingBy: 60)))
+
+                    let dateFormatter = DateFormatter()
+                    dateFormatter.dateFormat = "HH:mm:ss"
+
+                    print("\rFile \(currentFile)/\(totalFiles) (%\(Int(fileProgress * 100))) - Estimated time remaining: \(fileRemainingMinutes) minutes \(fileRemainingSeconds) seconds (Estimated completion: \(dateFormatter.string(from: fileEstimatedEndTime)))", terminator: "")
+                    fflush(stdout)
+                }
+
+                do {
+                    let content = try String(contentsOf: fileURL, encoding: .utf8)
+                    combinedSwiftContentQueue.async(flags: .barrier) {
+                        combinedSwiftContent += content.lowercased()
+                    }
+                } catch {
+                    print("\n⚠️ Could not read file: \(fileURL.lastPathComponent)")
+                }
+
+                fileGroup.leave()
             }
-
-            let fileProgress = Double(currentFile) / Double(totalFiles)
-            let fileElapsedTime = Date().timeIntervalSince(startTime)
-            let fileEstimatedTotalTime = fileElapsedTime / fileProgress
-            let fileRemainingTime = fileEstimatedTotalTime - fileElapsedTime
-            let fileEstimatedEndTime = Date(timeIntervalSinceNow: fileRemainingTime)
-
-            let fileRemainingMinutes = Int(fileRemainingTime) / 60
-            let fileRemainingSeconds = Int(fileRemainingTime) % 60
-
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "HH:mm:ss"
-
-            print("\rFile \(currentFile)/\(totalFiles) (%\(Int(fileProgress * 100))) - Estimated time remaining: \(fileRemainingMinutes) minutes \(fileRemainingSeconds) seconds (Estimated completion: \(dateFormatter.string(from: fileEstimatedEndTime)))", terminator: "")
-            fflush(stdout)
         }
+        
+        fileGroup.wait()
+        
+        let keyGroup = DispatchGroup()
+        let keyQueue = DispatchQueue(
+            label: "com.fileScanner.keyQueue",
+            qos: .userInitiated,
+            attributes: .concurrent
+        )
+        let currentOperationQueue = DispatchQueue(
+            label: "com.fileScanner.currentOperationQueue",
+            qos: .userInitiated
+        )
 
         for localizationKey in localizationKeys {
-            currentOperation += 1
+            keyGroup.enter()
+            keyQueue.async {
+                currentOperationQueue.sync {
+                    currentOperation += 1
 
-            if combinedSwiftContent.contains(localizationKey.key.lowercased()) {
-                localizationKey.isUsed = true
+                    let progress = Double(currentOperation) / Double(totalOperations)
+                    let elapsedTime = Date().timeIntervalSince(startTime)
+                    let estimatedTotalTime = elapsedTime / progress
+                    let remainingTime = estimatedTotalTime - elapsedTime
+                    let estimatedEndTime = Date(timeIntervalSinceNow: remainingTime)
+
+                    let remainingMinutes = Int(remainingTime) / 60
+                    let remainingSeconds = Int(remainingTime) % 60
+
+                    let dateFormatter = DateFormatter()
+                    dateFormatter.dateFormat = "HH:mm:ss"
+
+                    print("\rOperation \(currentOperation)/\(totalOperations) (%\(Int(progress * 100))) - Estimated time remaining: \(remainingMinutes) minutes \(remainingSeconds) seconds (Estimated completion: \(dateFormatter.string(from: estimatedEndTime)))", terminator: "")
+                    fflush(stdout)
+                }
+
+                if combinedSwiftContent.contains(localizationKey.key.lowercased()) {
+                    localizationKey.isUsed = true
+                }
+                
+                keyGroup.leave()
             }
-
-            let progress = Double(currentOperation) / Double(totalOperations)
-            let elapsedTime = Date().timeIntervalSince(startTime)
-            let estimatedTotalTime = elapsedTime / progress
-            let remainingTime = estimatedTotalTime - elapsedTime
-            let estimatedEndTime = Date(timeIntervalSinceNow: remainingTime)
-
-            let remainingMinutes = Int(remainingTime) / 60
-            let remainingSeconds = Int(remainingTime) % 60
-
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "HH:mm:ss"
-
-            print("\rOperation \(currentOperation)/\(totalOperations) (%\(Int(progress * 100))) - Estimated time remaining: \(remainingMinutes) minutes \(remainingSeconds) seconds (Estimated completion: \(dateFormatter.string(from: estimatedEndTime)))", terminator: "")
-            fflush(stdout)
         }
 
+        keyGroup.wait()
+        
         print("\n")
 
         if self.localizationKeys.isEmpty {
