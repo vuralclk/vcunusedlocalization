@@ -1,5 +1,7 @@
 import ArgumentParser
 import Foundation
+import SwiftSyntax
+import SwiftParser
 
 struct VCUnusedLocalization: ParsableCommand {
     static var configuration = CommandConfiguration(
@@ -83,6 +85,7 @@ final class FileScanner: FileScanning {
 
     private var swiftFileUrls = Set<URL>()
     private var localizationKeys = Set<LocalizationKey>()
+    private var stringLiterals = Set<String>()
 
     init(
         progressTracker: ProgressTracking,
@@ -112,7 +115,7 @@ final class FileScanner: FileScanning {
         )
 
         while let fileURL = enumerator?.nextObject() as? URL {
-            if fileURL.pathExtension.lowercased() == "strings" && fileURL.path.contains("tr.lproj") && fileURL.path.contains("InfoPlist.strings") == false {
+            if fileURL.pathExtension.lowercased() == "strings" && fileURL.path.contains("InfoPlist.strings") == false {
                 print("Found .strings file: \(fileURL.path)")
                 do {
                     let keys = try self.localizationParser.parseStringsFile(at: fileURL)
@@ -127,128 +130,87 @@ final class FileScanner: FileScanning {
     }
     
     private func findUnusedKeys() {
-        print("\n🔍 Searching for unused keys...")
+        print("\n🔍 Kullanılmayan anahtarlar aranıyor...")
         
-        let totalOperations = localizationKeys.count
-        var currentOperation = 0
+        print("\n- Toplam \(localizationKeys.count) lokalizasyon anahtarı bulundu.")
+        print("\n- Toplam \(swiftFileUrls.count) swift dosyası bulundu.")
+        
         let startTime = Date()
-
-        print("\n- Found total \(localizationKeys.count) localization keys.")
-        print("\n- Found total \(swiftFileUrls.count) swift files.")
-
-        var combinedSwiftContent = ""
-        let totalFiles = swiftFileUrls.count
         var currentFile = 0
+        let totalFiles = swiftFileUrls.count
+        var lastUpdateTime = Date()
+        var averageTimePerFile: TimeInterval = 0
         
-        let fileGroup = DispatchGroup()
-        let fileQueue = DispatchQueue(
-            label: "com.fileScanner.fileQueue",
-            qos: .userInitiated,
-            attributes: .concurrent
-        )
-        let combinedSwiftContentQueue = DispatchQueue(
-            label: "com.fileScanner.combinedSwiftContentQueue",
-            qos: .userInitiated,
-            attributes: .concurrent
-        )
-        let swiftFileUrlsPrintQueue = DispatchQueue(
-            label: "com.fileScanner.swiftFileUrlsPrintQueue",
-            qos: .userInitiated
-        )
-
+        // Swift dosyalarından string literalleri toplama
         for fileURL in swiftFileUrls {
-            fileGroup.enter()
-            fileQueue.async {
-                swiftFileUrlsPrintQueue.sync {
-                    currentFile += 1
-
-                    let fileProgress = currentFile > 0 ? Double(currentFile) / Double(totalFiles) : 0
-                    let fileElapsedTime = Date().timeIntervalSince(startTime)
-
-                    let fileEstimatedTotalTime = fileProgress > 0 ? fileElapsedTime / fileProgress : 0
-                    let fileRemainingTime = max(0, fileEstimatedTotalTime - fileElapsedTime)
-                    let fileEstimatedEndTime = Date(timeIntervalSinceNow: fileRemainingTime)
-
-                    let fileRemainingMinutes = Int(floor(fileRemainingTime / 60))
-                    let fileRemainingSeconds = Int(floor(fileRemainingTime.truncatingRemainder(dividingBy: 60)))
-
-                    let dateFormatter = DateFormatter()
-                    dateFormatter.dateFormat = "HH:mm:ss"
-
-                    print("\rFile \(currentFile)/\(totalFiles) (%\(Int(fileProgress * 100))) - Estimated time remaining: \(fileRemainingMinutes) minutes \(fileRemainingSeconds) seconds (Estimated completion: \(dateFormatter.string(from: fileEstimatedEndTime)))", terminator: "")
-                    fflush(stdout)
-                }
-
-                do {
-                    let content = try String(contentsOf: fileURL, encoding: .utf8)
-                    combinedSwiftContentQueue.async(flags: .barrier) {
-                        combinedSwiftContent += content.lowercased()
-                    }
-                } catch {
-                    print("\n⚠️ Could not read file: \(fileURL.lastPathComponent)")
-                }
-
-                fileGroup.leave()
-            }
-        }
-        
-        fileGroup.wait()
-        
-        let keyGroup = DispatchGroup()
-        let keyQueue = DispatchQueue(
-            label: "com.fileScanner.keyQueue",
-            qos: .userInitiated,
-            attributes: .concurrent
-        )
-        let currentOperationQueue = DispatchQueue(
-            label: "com.fileScanner.currentOperationQueue",
-            qos: .userInitiated
-        )
-
-        for localizationKey in localizationKeys {
-            keyGroup.enter()
-            keyQueue.async {
-                currentOperationQueue.sync {
-                    currentOperation += 1
-
-                    let progress = Double(currentOperation) / Double(totalOperations)
-                    let elapsedTime = Date().timeIntervalSince(startTime)
-                    let estimatedTotalTime = elapsedTime / progress
-                    let remainingTime = estimatedTotalTime - elapsedTime
-                    let estimatedEndTime = Date(timeIntervalSinceNow: remainingTime)
-
-                    let remainingMinutes = Int(remainingTime) / 60
-                    let remainingSeconds = Int(remainingTime) % 60
-
-                    let dateFormatter = DateFormatter()
-                    dateFormatter.dateFormat = "HH:mm:ss"
-
-                    print("\rOperation \(currentOperation)/\(totalOperations) (%\(Int(progress * 100))) - Estimated time remaining: \(remainingMinutes) minutes \(remainingSeconds) seconds (Estimated completion: \(dateFormatter.string(from: estimatedEndTime)))", terminator: "")
-                    fflush(stdout)
-                }
-
-                if combinedSwiftContent.contains(localizationKey.key.lowercased()) {
-                    localizationKey.isUsed = true
-                }
+            currentFile += 1
+            do {
+                print("\n📄 Taranan dosya: \(fileURL.lastPathComponent)")
+                let sourceFile = try Parser.parse(source: String(contentsOf: fileURL, encoding: .utf8))
+                let visitor = StringLiteralVisitor(viewMode: .sourceAccurate)
+                visitor.walk(sourceFile)                
+                stringLiterals.formUnion(visitor.stringLiterals)
                 
-                keyGroup.leave()
+                // Kalan süreyi hesapla
+                let currentTime = Date()
+                let elapsedTime = currentTime.timeIntervalSince(lastUpdateTime)
+                lastUpdateTime = currentTime
+                
+                // Ortalama süreyi güncelle
+                averageTimePerFile = (averageTimePerFile * Double(currentFile - 1) + elapsedTime) / Double(currentFile)
+                
+                // Kalan dosya sayısı ve tahmini süre
+                let remainingFiles = totalFiles - currentFile
+                let estimatedRemainingTime = averageTimePerFile * Double(remainingFiles)
+                
+                let progress = Double(currentFile) / Double(totalFiles)
+                print("\rDosya \(currentFile)/\(totalFiles) (%\(Int(progress * 100))) taranıyor... Tahmini kalan süre: \(String(format: "%.1f", estimatedRemainingTime))s", terminator: "")
+                fflush(stdout)
+                
+            } catch {
+                print("\n⚠️ Dosya okunamadı: \(fileURL.lastPathComponent)")
             }
         }
-
-        keyGroup.wait()
         
-        print("\n")
-
-        if self.localizationKeys.isEmpty {
-            print("\n⚠️ No localization keys found.")
-        } else {
-            print("\n📝 All Localization Keys:")
-            self.localizationKeys.forEach { key in
-                if key.isUsed == false {
-                    print("Key: \(key.key), File: \(key.file), Line: \(key.lineNumber), Unused")
+        print("\n📝 Kullanılmayan Lokalizasyon Anahtarları:")
+        
+        // Dosya bazında gruplandırma için dictionary oluştur
+        var unusedKeysByFile: [String: [LocalizationKey]] = [:]
+        
+        // Kullanılmayan anahtarları dosyalarına göre grupla
+        for key in localizationKeys {
+            if !stringLiterals.contains(key.key) {
+                if unusedKeysByFile[key.file] == nil {
+                    unusedKeysByFile[key.file] = []
                 }
+                unusedKeysByFile[key.file]?.append(key)
             }
         }
+        
+        // Her dosya için gruplandırılmış çıktıyı yazdır
+        for (file, keys) in unusedKeysByFile {
+            print("\n\(file)")
+            print("    Unused Keys")
+            for key in keys {
+                print("        - \(key.key)")
+            }
+        }
+        
+        let totalTime = Date().timeIntervalSince(startTime)
+        print("\nTarama tamamlandı: \(String(format: "%.1f", totalTime))s")
+    }
+}
+
+class StringLiteralVisitor: SyntaxVisitor {
+    var stringLiterals = Set<String>()
+    
+    override func visit(_ node: StringLiteralExprSyntax) -> SyntaxVisitorContinueKind {
+        for segment in node.segments {
+            if let text = segment.as(StringSegmentSyntax.self)?.content.text {
+                stringLiterals.insert(text)
+            }
+        }
+        return .skipChildren
     }
 }
 
