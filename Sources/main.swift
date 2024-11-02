@@ -1,11 +1,10 @@
 import ArgumentParser
 import Foundation
 
-// MARK: - Command Line Interface
 struct VCUnusedLocalization: ParsableCommand {
     static var configuration = CommandConfiguration(
-        commandName: "vcunusedlocalization",
-        abstract: "İlk .strings dosyasını tarar",
+        commandName: "vcunusedlocalization", 
+        abstract: "Scans all files in the project to detect unused localization keys",
         subcommands: [ScanCommand.self]
     )
 }
@@ -13,10 +12,10 @@ struct VCUnusedLocalization: ParsableCommand {
 struct ScanCommand: ParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "scan",
-        abstract: "İlk .strings dosyasını tarar"
+        abstract: "Scans all files in the project to detect unused localization keys"
     )
 
-    @Option(name: .shortAndLong, help: "Proje dizin yolu")
+    @Option(name: .shortAndLong, help: "Project directory path")
     var path: String = FileManager.default.currentDirectoryPath
 
     func run() throws {
@@ -35,13 +34,12 @@ struct ScanCommand: ParsableCommand {
             )
             try analyzer.analyzeProject(at: path)
         } catch {
-            print("Hata: \(error.localizedDescription)")
+            print("Error: \(error.localizedDescription)")
             throw error
         }
     }
 }
 
-// MARK: - Progress Tracking
 protocol ProgressTracking {
     func updateProgress(_ current: Int, total: Int, step: String)
 }
@@ -56,7 +54,7 @@ final class ProgressTracker: ProgressTracking {
             currentStep = step
             currentProgress = 0
             totalProgress = total
-            print("\n\(step) başlatıldı...")
+            print("\n\(step) started...")
         }
         
         currentProgress = current
@@ -70,12 +68,11 @@ final class ProgressTracker: ProgressTracking {
         fflush(stdout)
         
         if currentProgress == totalProgress {
-            print("\n\(step) tamamlandı.")
+            print("\n\(step) completed.")
         }
     }
 }
 
-// MARK: - File Scanning
 protocol FileScanning {
     func scan(at path: String) throws
 }
@@ -100,13 +97,13 @@ final class FileScanner: FileScanning {
             try findFileUrls(at: path)
             findUnusedKeys()
         } catch {
-            print("Dosyalar taranırken hata oluştu: \(error.localizedDescription)")
+            print("Error scanning files: \(error.localizedDescription)")
             throw error
         }
     }
 
     private func findFileUrls(at path: String) throws {
-        print("\n🔍 .strings dosyası aranıyor...")
+        print("\n🔍 Searching for .strings file...")
         let fileManager = FileManager.default
         let enumerator = fileManager.enumerator(
             at: URL(fileURLWithPath: path),
@@ -116,12 +113,12 @@ final class FileScanner: FileScanning {
 
         while let fileURL = enumerator?.nextObject() as? URL {
             if fileURL.pathExtension.lowercased() == "strings" && fileURL.path.contains("tr.lproj") && fileURL.path.contains("InfoPlist.strings") == false {
-                print("Bulunan .strings dosyası: \(fileURL.path)")
+                print("Found .strings file: \(fileURL.path)")
                 do {
                     let keys = try self.localizationParser.parseStringsFile(at: fileURL)
                     self.localizationKeys.formUnion(keys)
                 } catch {
-                    print("Hata: \(error.localizedDescription)")
+                    print("Error: \(error.localizedDescription)")
                 }
             } else if fileURL.pathExtension.lowercased() == "swift" {
                 swiftFileUrls.insert(fileURL)
@@ -130,16 +127,15 @@ final class FileScanner: FileScanning {
     }
     
     private func findUnusedKeys() {
-        print("\n🔍 Kullanılmayan key'ler aranıyor...")
+        print("\n🔍 Searching for unused keys...")
         
         let totalOperations = localizationKeys.count
         var currentOperation = 0
         let startTime = Date()
 
-        print("\n- Toplam \(localizationKeys.count) adet localizationKey bulundu.")
-        print("\n- Toplam \(swiftFileUrls.count) adet swiftFile bulundu.")
+        print("\n- Found total \(localizationKeys.count) localization keys.")
+        print("\n- Found total \(swiftFileUrls.count) swift files.")
 
-        // Tüm Swift dosyalarını tek bir string olarak birleştir
         var combinedSwiftContent = ""
         let totalFiles = swiftFileUrls.count
         var currentFile = 0
@@ -150,10 +146,9 @@ final class FileScanner: FileScanning {
                 let content = try String(contentsOf: fileURL, encoding: .utf8)
                 combinedSwiftContent += content.lowercased()
             } catch {
-                print("\n⚠️ Dosya okunamadı: \(fileURL.lastPathComponent)")
+                print("\n⚠️ Could not read file: \(fileURL.lastPathComponent)")
             }
 
-            // Dosya işleme ilerlemesini hesapla ve yazdır
             let fileProgress = Double(currentFile) / Double(totalFiles)
             let fileElapsedTime = Date().timeIntervalSince(startTime)
             let fileEstimatedTotalTime = fileElapsedTime / fileProgress
@@ -166,11 +161,10 @@ final class FileScanner: FileScanning {
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "HH:mm:ss"
 
-            print("\rDosya \(currentFile)/\(totalFiles) (%\(Int(fileProgress * 100))) - Tahmini kalan süre: \(fileRemainingMinutes) dakika \(fileRemainingSeconds) saniye (Tahmini bitiş: \(dateFormatter.string(from: fileEstimatedEndTime)))", terminator: "")
+            print("\rFile \(currentFile)/\(totalFiles) (%\(Int(fileProgress * 100))) - Estimated time remaining: \(fileRemainingMinutes) minutes \(fileRemainingSeconds) seconds (Estimated completion: \(dateFormatter.string(from: fileEstimatedEndTime)))", terminator: "")
             fflush(stdout)
         }
 
-        // Her bir localization key'i birleşik string içinde ara
         for localizationKey in localizationKeys {
             currentOperation += 1
 
@@ -190,26 +184,25 @@ final class FileScanner: FileScanning {
             let dateFormatter = DateFormatter()
             dateFormatter.dateFormat = "HH:mm:ss"
 
-            print("\rİşlem \(currentOperation)/\(totalOperations) (%\(Int(progress * 100))) - Tahmini kalan süre: \(remainingMinutes) dakika \(remainingSeconds) saniye (Tahmini bitiş: \(dateFormatter.string(from: estimatedEndTime)))", terminator: "")
+            print("\rOperation \(currentOperation)/\(totalOperations) (%\(Int(progress * 100))) - Estimated time remaining: \(remainingMinutes) minutes \(remainingSeconds) seconds (Estimated completion: \(dateFormatter.string(from: estimatedEndTime)))", terminator: "")
             fflush(stdout)
         }
 
-        print("\n") // Yeni satıra geç
+        print("\n")
 
         if self.localizationKeys.isEmpty {
-            print("\n⚠️ Hiç localization key'i bulunamadı.")
+            print("\n⚠️ No localization keys found.")
         } else {
-            print("\n📝 Tüm Localization Key'leri:")
+            print("\n📝 All Localization Keys:")
             self.localizationKeys.forEach { key in
                 if key.isUsed == false {
-                    print("Key: \(key.key), Dosya: \(key.file), Satır: \(key.lineNumber), Kullanilmiyor")
+                    print("Key: \(key.key), File: \(key.file), Line: \(key.lineNumber), Unused")
                 }
             }
         }
     }
 }
 
-// MARK: - Localization Parsing
 protocol LocalizationParsing {
     func parseStringsFile(at url: URL) throws -> Set<LocalizationKey>
 }
@@ -254,7 +247,7 @@ final class LocalizationParser: LocalizationParsing {
                 options: [.allowCommentsAndWhitespace, .dotMatchesLineSeparators]
             )
         } catch {
-            print("Regex pattern hatası: \(error.localizedDescription)")
+            print("Regex pattern error: \(error.localizedDescription)")
             exit(1)
         }
     }()
@@ -283,11 +276,11 @@ final class LocalizationParser: LocalizationParsing {
         }
         
         guard let content = content else {
-            print("Dosya okunamadı: \(url.lastPathComponent)")
-            throw NSError(domain: "LocalizationParser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Dosya okunamadı: \(url.lastPathComponent)"])
+            print("Could not read file: \(url.lastPathComponent)")
+            throw NSError(domain: "LocalizationParser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not read file: \(url.lastPathComponent)"])
         }
         
-        print("\n📄 Dosya analiz ediliyor: \(url.lastPathComponent)")
+        print("\n📄 Analyzing file: \(url.lastPathComponent)")
         
         let range = NSRange(location: 0, length: content.utf16.count)
         let matches = keyPattern.matches(in: content, options: [], range: range)
@@ -295,7 +288,7 @@ final class LocalizationParser: LocalizationParsing {
         var localizationKeys = Set<LocalizationKey>()
 
         for (index, match) in matches.enumerated() {
-            progressTracker.updateProgress(index + 1, total: matches.count, step: "Dosya analiz ediliyor")
+            progressTracker.updateProgress(index + 1, total: matches.count, step: "Analyzing file")
             
             if let keyRange = Range(match.range(at: 1), in: content) {
                 let key = String(content[keyRange])
@@ -316,7 +309,6 @@ final class LocalizationParser: LocalizationParsing {
     }
 }
 
-// MARK: - Main Analyzer
 final class LocalizationAnalyzer {
     private let fileScanner: FileScanning
     private let progressTracker: ProgressTracking
@@ -336,12 +328,12 @@ final class LocalizationAnalyzer {
         do {
             try fileScanner.scan(at: path)
         } catch {
-            print("Proje analiz edilirken hata oluştu: \(error.localizedDescription)")
+            print("Error analyzing project: \(error.localizedDescription)")
             throw error
         }
 
         let totalTime = Date().timeIntervalSince(startTime ?? Date())
-        print("\nTamamlandı: \(String(format: "%.1f", totalTime))s")
+        print("\nCompleted in: \(String(format: "%.1f", totalTime))s")
     }
 }
 
