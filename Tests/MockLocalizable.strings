@@ -1,0 +1,102 @@
+// 1. Basit tek satırlık tanımlar
+"basic.key" = "Basic value";
+"basic_key" = "Basic value";
+"basicKey" = "Basic value";
+
+// 2. Çok satırlı değerler
+"multiline.key" = "First line
+Second line
+Third line";
+
+// 3. Kaçış karakterleri içeren değerler
+"escaped.quotes" = "Value with \"quoted\" text";
+"escaped.characters" = "Tab\t and newline\n and quotes \" and slash \\";
+
+// 4. Unicode karakterler
+"unicode.bullet" = "\u2022 Bullet point";
+"unicode.emoji" = "\U0001F604 Smiling face";
+"unicode.text" = "Unicode karakterler: çğıöşü";
+
+// 5. Farklı boşluk kullanımları
+"no.spaces"="Value";
+"many.spaces"     =     "Value"     ;
+"tab.spaces"        =        "Value"        ;
+
+// 6. Yorumlar
+// Tek satırlık yorum
+"after.comment" = "Value";
+
+/* Çok
+   satırlı
+   yorum */
+"after.multiline.comment" = "Value";
+
+"inline.comment" = "Value"; // Satır sonu yorumu
+
+// 7. Özel karakterler içeren key'ler
+"key.with.dots" = "Value";
+"key_with_underscore" = "Value";
+"key-with-dash" = "Value";
+"key with spaces" = "Value";
+"key/with/slashes" = "Value";
+"key+with+plus" = "Value";
+"key&with&ampersand" = "Value";
+"key#with#hash" = "Value";
+"key@with@at" = "Value";
+
+// 8. Noktalı virgül içeren değerler
+"semicolon.in.value" = "Value with; semicolon";
+"multiple.semicolons" = "First; Second; Third";
+
+// 9. Boş değerler
+"empty.value" = "";
+"empty.value.with.spaces" = "   ";
+
+// 10. Çok satırlı ve kaçış karakterli kompleks değerler
+"complex.value" = "First line with \"quotes\"
+Second line with \t tab
+Third line with \n newline
+Fourth line with Unicode \u2022
+Fifth line with everything \"quotes\", \t, \n, \u2022";
+
+// 11. Hatalı ama potansiyel olarak geçerli formatlar
+"trailing.spaces" = "Value"  ;
+"double.semicolon" = "Value";;
+"missing.semicolon" = "Value"
+"missing.value" = ;
+"missing.equals.sign" "Value";
+"missing.quotes" = Value;
+
+// 12. HTML ve XML içeren değerler
+"html.value" = "<b>Bold</b> and <i>italic</i>";
+"xml.value" = "<tag attribute=\"value\">Content</tag>";
+
+// 13. JSON içeren değerler
+"json.value" = "{\"key\": \"value\", \"nested\": {\"key\": \"value\"}}";
+
+// 14. URL içeren değerler
+"url.value" = "https://example.com/path?param=value&other=value#fragment";
+
+// 15. Regex içeren değerler
+"regex.value" = "^[A-Za-z0-9]+$";
+
+// 16. Matematiksel ifadeler içeren değerler
+"math.value" = "2 + 2 = 4";
+"formula.value" = "E = mc²";
+
+// 17. Farklı dil karakterleri
+"chinese.value" = "你好世界";
+"japanese.value" = "こんにちは世界";
+"korean.value" = "안녕하세요 세계";
+"russian.value" = "Привет, мир";
+"arabic.value" = "مرحبا بالعالم";
+
+// 18. Emoji içeren değerler
+"emoji.value" = "Hello 👋 World 🌍";
+
+// 19. Özel formatlar içeren değerler
+"placeholder.value" = "Hello %@ World";
+"format.value" = "Number: %d, String: %@, Float: %.2f";
+
+// 20. Base64 içeren değerler
+"base64.value" = "SGVsbG8gV29ybGQ=";
