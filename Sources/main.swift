@@ -100,23 +100,25 @@ final class FileScanner: FileScanning {
             try findFileUrls(at: path)
             findUnusedKeys()
         } catch {
-            print("Error scanning files: \(error.localizedDescription)")
+            print("❌ Error scanning files: \(error.localizedDescription)")
             throw error
         }
     }
 
     private func findFileUrls(at path: String) throws {
-        print("\n🔍 Searching for .strings file...")
+        print("\n🔍 Searching for Localization Keys in .strings files...")
         let fileManager = FileManager.default
         let enumerator = fileManager.enumerator(
             at: URL(fileURLWithPath: path),
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles]
         )
-
+        
+        var stringsFilePaths: [String] = []
+        
         while let fileURL = enumerator?.nextObject() as? URL {
-            if fileURL.pathExtension.lowercased() == "strings" && fileURL.path.contains("InfoPlist.strings") == false {
-                print("Found .strings file: \(fileURL.path)")
+            if fileURL.pathExtension.lowercased() == "strings" && fileURL.path.contains("InfoPlist.strings") == false && fileURL.path.contains("Pods") == false {
+                stringsFilePaths.append(fileURL.path)
                 do {
                     let keys = try self.localizationParser.parseStringsFile(at: fileURL)
                     self.localizationKeys.formUnion(keys)
@@ -127,13 +129,18 @@ final class FileScanner: FileScanning {
                 swiftFileUrls.insert(fileURL)
             }
         }
+        
+        print("\nFound .strings file paths:")
+        for path in stringsFilePaths {
+            print("      - \(path)")
+        }
     }
     
     private func findUnusedKeys() {
-        print("\n🔍 Kullanılmayan anahtarlar aranıyor...")
+        print("\n🔍 Searching for unused keys...")
         
-        print("\n- Toplam \(localizationKeys.count) lokalizasyon anahtarı bulundu.")
-        print("\n- Toplam \(swiftFileUrls.count) swift dosyası bulundu.")
+        print("\n📊 Total \(localizationKeys.count) localization keys found.")
+        print("\n📱 Total \(swiftFileUrls.count) swift files found.")
         
         let startTime = Date()
         var currentFile = 0
@@ -141,43 +148,36 @@ final class FileScanner: FileScanning {
         var lastUpdateTime = Date()
         var averageTimePerFile: TimeInterval = 0
         
-        // Swift dosyalarından string literalleri toplama
         for fileURL in swiftFileUrls {
             currentFile += 1
             do {
-                print("\n📄 Taranan dosya: \(fileURL.lastPathComponent)")
                 let sourceFile = try Parser.parse(source: String(contentsOf: fileURL, encoding: .utf8))
                 let visitor = StringLiteralVisitor(viewMode: .sourceAccurate)
                 visitor.walk(sourceFile)                
                 stringLiterals.formUnion(visitor.stringLiterals)
 
-                // Kalan süreyi hesapla
                 let currentTime = Date()
                 let elapsedTime = currentTime.timeIntervalSince(lastUpdateTime)
                 lastUpdateTime = currentTime
                 
-                // Ortalama süreyi güncelle
                 averageTimePerFile = (averageTimePerFile * Double(currentFile - 1) + elapsedTime) / Double(currentFile)
                 
-                // Kalan dosya sayısı ve tahmini süre
                 let remainingFiles = totalFiles - currentFile
                 let estimatedRemainingTime = averageTimePerFile * Double(remainingFiles)
                 
                 let progress = Double(currentFile) / Double(totalFiles)
-                print("\rDosya \(currentFile)/\(totalFiles) (%\(Int(progress * 100))) taranıyor... Tahmini kalan süre: \(String(format: "%.1f", estimatedRemainingTime))s", terminator: "")
+                print("\rScanning file \(currentFile)/\(totalFiles) (%\(Int(progress * 100)))... Estimated time remaining: \(Int(estimatedRemainingTime))s", terminator: "")
                 fflush(stdout)
                 
             } catch {
-                print("\n⚠️ Dosya okunamadı: \(fileURL.lastPathComponent)")
+                print("\n⚠️ Could not read file: \(fileURL.lastPathComponent)")
             }
         }
         
-        print("\n📝 Kullanılmayan Lokalizasyon Anahtarları:")
+        print("\n📝 Unused Localization Keys:")
         
-        // Dosya bazında gruplandırma için dictionary oluştur
         var unusedKeysByFile: [String: [LocalizationKey]] = [:]
         
-        // Kullanılmayan anahtarları dosyalarına göre grupla
         for key in localizationKeys {
             if !stringLiterals.contains(key.key) {
                 if unusedKeysByFile[key.file] == nil {
@@ -187,7 +187,6 @@ final class FileScanner: FileScanning {
             }
         }
         
-        // Her dosya için gruplandırılmış çıktıyı yazdır
         for (file, keys) in unusedKeysByFile {
             print("\n\(file)")
             print("    Unused Keys")
@@ -196,8 +195,11 @@ final class FileScanner: FileScanning {
             }
         }
         
+        let totalUnusedKeys = unusedKeysByFile.values.map { $0.count }.reduce(0, +)
+        print("\n📊 Total \(totalUnusedKeys) unused localization keys found.")
+        
         let totalTime = Date().timeIntervalSince(startTime)
-        print("\nTarama tamamlandı: \(String(format: "%.1f", totalTime))s")
+        print("\n⏱️ Scan completed in: \(String(format: "%.1f", totalTime))s")
     }
 }
 
@@ -269,36 +271,48 @@ final class LocalizationParser: LocalizationParsing {
     }
 
     func parseStringsFile(at url: URL) throws -> Set<LocalizationKey> {
-        print("\n📄 Dosya analiz ediliyor: \(url.lastPathComponent)")
-        
-        if let data = try? Data(contentsOf: url),
-           let content = String(data: data, encoding: .utf8),
-           let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String] {
-            print("✅ Dosya dictionary olarak başarıyla okundu")
-            var localizationKeys = Set<LocalizationKey>()
-            
-            let total = dict.count
-            for (index, (key, _)) in dict.enumerated() {
-                progressTracker.updateProgress(index + 1, total: total, step: "Dosya analiz ediliyor")
-                
+        var content: String? = nil
+        let encodings: [String.Encoding] = [
+            .utf8,
+            .utf16,
+            .utf16BigEndian,
+            .utf16LittleEndian
+        ]
+
+        for encoding in encodings {
+            if let fileContent = try? String(contentsOf: url, encoding: encoding) {
+                content = fileContent
+                break
+            }
+        }
+
+        guard let content = content else {
+            print("Could not read file: \(url.lastPathComponent)")
+            throw NSError(domain: "LocalizationParser", code: 1, userInfo: [NSLocalizedDescriptionKey: "Could not read file: \(url.lastPathComponent)"])
+        }
+
+        let range = NSRange(location: 0, length: content.utf16.count)
+        let matches = keyPattern.matches(in: content, options: [], range: range)
+
+        var localizationKeys = Set<LocalizationKey>()
+
+        for (index, match) in matches.enumerated() {
+            if let keyRange = Range(match.range(at: 1), in: content) {
+                let key = String(content[keyRange])
+                let lineNumber = content.prefix(through: content.index(content.startIndex, offsetBy: match.range.location))
+                    .components(separatedBy: .newlines)
+                    .count
+
                 localizationKeys.insert(LocalizationKey(
                     key: key,
                     file: url.lastPathComponent,
-                    lineNumber: 0,
+                    lineNumber: lineNumber,
                     isUsed: false
                 ))
             }
-            
-            return localizationKeys
-        } else {
-            throw NSError(
-                domain: "LocalizationParserError",
-                code: 1001,
-                userInfo: [
-                    NSLocalizedDescriptionKey: "Strings dosyası okunamadı: \(url.lastPathComponent). Dosya formatı geçerli değil veya bozuk olabilir."
-                ]
-            )
         }
+
+        return localizationKeys
     }
 }
 
@@ -326,7 +340,7 @@ final class LocalizationAnalyzer {
         }
 
         let totalTime = Date().timeIntervalSince(startTime ?? Date())
-        print("\nCompleted in: \(String(format: "%.1f", totalTime))s")
+        print("\n🎉 Completed in: \(String(format: "%.1f", totalTime))s")
     }
 }
 
