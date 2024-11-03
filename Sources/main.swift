@@ -252,15 +252,32 @@ final class LocalizationParser: LocalizationParsing {
         do {
             return try NSRegularExpression(
                 pattern: #"""
-                "([^"]+)"                                  
-                \s*=\s*
-                "(?:[^"\\]|\\.|\n)*"                      
-                \s*;                                       
+                (?<!\\)"                           # Başlangıç tırnak işareti (escape edilmemiş)
+                (                                  # Key yakalama grubu başlangıcı
+                    [^"\\]*                       # Tırnak veya slash olmayan karakterler
+                    (?:
+                        \\.                       # Escape edilmiş herhangi bir karakter
+                        [^"\\]*                   # Tekrar normal karakterler
+                    )*
+                )                                 # Key yakalama grubu sonu
+                "                                 # Bitiş tırnak işareti
+                \s*=\s*                          # Eşittir işareti ve opsiyonel boşluklar
+                "                                 # Değer başlangıç tırnak işareti
+                (?:
+                    [^"\\]*                      # Tırnak veya slash olmayan karakterler
+                    (?:
+                        \\.                      # Escape edilmiş karakterler
+                        [^"\\]*                  # Normal karakterler
+                    )*
+                    (?:\n[^"\\]*)*              # Çok satırlı değerler için
+                )
+                "                                # Değer bitiş tırnak işareti
+                \s*;                             # Noktalı virgül ve opsiyonel boşluklar
                 """#,
                 options: [.allowCommentsAndWhitespace, .dotMatchesLineSeparators]
             )
         } catch {
-            print("Regex pattern error: \(error.localizedDescription)")
+            print("Regex pattern hatası: \(error.localizedDescription)")
             exit(1)
         }
     }()

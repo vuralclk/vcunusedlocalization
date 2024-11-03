@@ -1,0 +1,94 @@
+// 1. Simple key
+"basic.key" = "Basic value";
+
+// 2. Multiline value
+"multiline.key" = "First line
+Second line
+Third line";
+
+// 3. Escape characters
+"escaped.key" = "Tab\t and newline\n and quotes \" and slash \\";
+
+// 4. Unicode character
+"unicode.key" = "\u2022 Bullet point and emoji \U0001F604";
+
+// 5. Space usage
+"spaces.key"     =     "Value"     ;
+
+// 6. Comment after
+"comment.key" = "Value"; // End of line comment
+
+// 7. Key with special characters
+"key-with-special/chars&@#" = "Value";
+
+// 8. Format specifiers
+"format.key" = "Number: %d, String: %@, Float: %.2f";
+
+// 9. HTML content
+"html.key" = "<b>Bold</b> and <i>italic</i>";
+
+// 10. JSON content
+"json.key" = "{\"key\": \"value\"}";
+
+// 11. Empty value
+"empty.key" = "";
+
+// 12. Emoji content
+"emoji.key" = "Hello 👋 World 🌍";
+
+// 13. Single line comment examples
+// Normal comment line
+"comment1.key" = "Value 1";
+
+// Comment line with Turkish characters
+// Special characters: ğüşıöç
+"comment2.key" = "Value 2";
+
+// 14. Multiline comment example
+/*
+ * This is a multiline
+ * comment example
+ * It continues on different lines
+ */
+"multiline.comment.key" = "Value 3";
+
+// 15. Code example in comment
+"active.key" = "Bu aktif bir koddur";
+
+// 16. Mixed comment example
+// Single line comment
+/*
+ * Multiline comment
+ */
+"mixed.comment.key" = "Value 4";
+
+// 17. Chinese (Simplified & Traditional)
+"chinese.simplified.key" = "你好，世界";
+"chinese.traditional.key" = "妳好，世界";
+
+// 18. Japanese (Kanji, Hiragana, Katakana mixed)
+"japanese.key" = "こんにちは世界！カタカナとひらがな";
+"japanese.mixed.key" = "私の名前は田中です。";
+
+// 19. Korean
+"korean.key" = "안녕하세요 세상";
+
+// 20. Arabic (Right-to-left writing)
+"arabic.key" = "مرحبا بالعالم";
+"arabic.mixed.key" = "Hello مرحبا 123";
+
+// 21. Russian (Cyrillic alphabet)
+"russian.key" = "Привет, мир";
+
+// 22. Hindi
+"hindi.key" = "नमस्ते दुनिया";
+
+// 23. Thai
+"thai.key" = "สวัสดีชาวโลก";
+
+// 24. Mixed language usage
+"mixed.languages.key" = "Hello 世界 مرحبا Привет नमस्ते";
+
+// 25. Number formats
+"number.format.key" = "١٢٣٤٥٦٧٨٩٠"; // Arabic numerals
+"number.format.devanagari.key" = "१२३४५६७८९०"; // Devanagari

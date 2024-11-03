@@ -53,7 +53,6 @@ Third line";
 "multiline.comment.key" = "Value 3";
 
 // 15. Code example in comment
-// "unused.key" = "This is a code example in comment";
 "active.key" = "Bu aktif bir koddur";
 
 // 16. Mixed comment example
