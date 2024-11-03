@@ -1,102 +1,95 @@
-// 1. Basit tek satırlık tanımlar
+// 1. Simple key
 "basic.key" = "Basic value";
-"basic_key" = "Basic value";
-"basicKey" = "Basic value";
 
-// 2. Çok satırlı değerler
+// 2. Multiline value
 "multiline.key" = "First line
 Second line
 Third line";
 
-// 3. Kaçış karakterleri içeren değerler
-"escaped.quotes" = "Value with \"quoted\" text";
-"escaped.characters" = "Tab\t and newline\n and quotes \" and slash \\";
+// 3. Escape characters
+"escaped.key" = "Tab\t and newline\n and quotes \" and slash \\";
 
-// 4. Unicode karakterler
-"unicode.bullet" = "\u2022 Bullet point";
-"unicode.emoji" = "\U0001F604 Smiling face";
-"unicode.text" = "Unicode karakterler: çğıöşü";
+// 4. Unicode character
+"unicode.key" = "\u2022 Bullet point and emoji \U0001F604";
 
-// 5. Farklı boşluk kullanımları
-"no.spaces"="Value";
-"many.spaces"     =     "Value"     ;
-"tab.spaces"        =        "Value"        ;
+// 5. Space usage
+"spaces.key"     =     "Value"     ;
 
-// 6. Yorumlar
-// Tek satırlık yorum
-"after.comment" = "Value";
+// 6. Comment after
+"comment.key" = "Value"; // End of line comment
 
-/* Çok
-   satırlı
-   yorum */
-"after.multiline.comment" = "Value";
+// 7. Key with special characters
+"key-with-special/chars&@#" = "Value";
 
-"inline.comment" = "Value"; // Satır sonu yorumu
+// 8. Format specifiers
+"format.key" = "Number: %d, String: %@, Float: %.2f";
 
-// 7. Özel karakterler içeren key'ler
-"key.with.dots" = "Value";
-"key_with_underscore" = "Value";
-"key-with-dash" = "Value";
-"key with spaces" = "Value";
-"key/with/slashes" = "Value";
-"key+with+plus" = "Value";
-"key&with&ampersand" = "Value";
-"key#with#hash" = "Value";
-"key@with@at" = "Value";
+// 9. HTML content
+"html.key" = "<b>Bold</b> and <i>italic</i>";
 
-// 8. Noktalı virgül içeren değerler
-"semicolon.in.value" = "Value with; semicolon";
-"multiple.semicolons" = "First; Second; Third";
+// 10. JSON content
+"json.key" = "{\"key\": \"value\"}";
 
-// 9. Boş değerler
-"empty.value" = "";
-"empty.value.with.spaces" = "   ";
+// 11. Empty value
+"empty.key" = "";
 
-// 10. Çok satırlı ve kaçış karakterli kompleks değerler
-"complex.value" = "First line with \"quotes\"
-Second line with \t tab
-Third line with \n newline
-Fourth line with Unicode \u2022
-Fifth line with everything \"quotes\", \t, \n, \u2022";
+// 12. Emoji content
+"emoji.key" = "Hello 👋 World 🌍";
 
-// 11. Hatalı ama potansiyel olarak geçerli formatlar
-"trailing.spaces" = "Value"  ;
-"double.semicolon" = "Value";;
-"missing.semicolon" = "Value"
-"missing.value" = ;
-"missing.equals.sign" "Value";
-"missing.quotes" = Value;
+// 13. Single line comment examples
+// Normal comment line
+"comment1.key" = "Value 1";
 
-// 12. HTML ve XML içeren değerler
-"html.value" = "<b>Bold</b> and <i>italic</i>";
-"xml.value" = "<tag attribute=\"value\">Content</tag>";
+// Comment line with Turkish characters
+// Special characters: ğüşıöç
+"comment2.key" = "Value 2";
 
-// 13. JSON içeren değerler
-"json.value" = "{\"key\": \"value\", \"nested\": {\"key\": \"value\"}}";
+// 14. Multiline comment example
+/*
+ * This is a multiline
+ * comment example
+ * It continues on different lines
+ */
+"multiline.comment.key" = "Value 3";
 
-// 14. URL içeren değerler
-"url.value" = "https://example.com/path?param=value&other=value#fragment";
+// 15. Code example in comment
+// "unused.key" = "This is a code example in comment";
+"active.key" = "Bu aktif bir koddur";
 
-// 15. Regex içeren değerler
-"regex.value" = "^[A-Za-z0-9]+$";
+// 16. Mixed comment example
+// Single line comment
+/*
+ * Multiline comment
+ */
+"mixed.comment.key" = "Value 4";
 
-// 16. Matematiksel ifadeler içeren değerler
-"math.value" = "2 + 2 = 4";
-"formula.value" = "E = mc²";
+// 17. Chinese (Simplified & Traditional)
+"chinese.simplified.key" = "你好，世界";
+"chinese.traditional.key" = "妳好，世界";
 
-// 17. Farklı dil karakterleri
-"chinese.value" = "你好世界";
-"japanese.value" = "こんにちは世界";
-"korean.value" = "안녕하세요 세계";
-"russian.value" = "Привет, мир";
-"arabic.value" = "مرحبا بالعالم";
+// 18. Japanese (Kanji, Hiragana, Katakana mixed)
+"japanese.key" = "こんにちは世界！カタカナとひらがな";
+"japanese.mixed.key" = "私の名前は田中です。";
 
-// 18. Emoji içeren değerler
-"emoji.value" = "Hello 👋 World 🌍";
+// 19. Korean
+"korean.key" = "안녕하세요 세상";
 
-// 19. Özel formatlar içeren değerler
-"placeholder.value" = "Hello %@ World";
-"format.value" = "Number: %d, String: %@, Float: %.2f";
+// 20. Arabic (Right-to-left writing)
+"arabic.key" = "مرحبا بالعالم";
+"arabic.mixed.key" = "Hello مرحبا 123";
 
-// 20. Base64 içeren değerler
-"base64.value" = "SGVsbG8gV29ybGQ=";
+// 21. Russian (Cyrillic alphabet)
+"russian.key" = "Привет, мир";
+
+// 22. Hindi
+"hindi.key" = "नमस्ते दुनिया";
+
+// 23. Thai
+"thai.key" = "สวัสดีชาวโลก";
+
+// 24. Mixed language usage
+"mixed.languages.key" = "Hello 世界 مرحبا Привет नमस्ते";
+
+// 25. Number formats
+"number.format.key" = "١٢٣٤٥٦٧٨٩٠"; // Arabic numerals
+"number.format.devanagari.key" = "१२३४५६७८९०"; // Devanagari

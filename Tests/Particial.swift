@@ -1,14 +1,16 @@
 import Foundation
 
-final class PartialLocalizationManager {
-    // MARK: - Basic Keys
-    let basicKey = NSLocalizedString("basic.key", comment: "")
-    let basicUnderscoreKey = NSLocalizedString("basic_key", comment: "")
-
-    // MARK: - Special Cases
-    let multilineKey = NSLocalizedString("multiline.key", comment: "")
-    let emojiValue = NSLocalizedString("emoji.value", comment: "")
-
-    // MARK: - Formatted
-    let placeholderValue = String(format: NSLocalizedString("placeholder.value", comment: ""), "Alice")
+final class ParticialLocalizationManager {
+    let basicKey = "basic.key"
+    let multilineKey = "multiline.key"
+    let escapedKey = "escaped.key"
+    let unicodeKey = "unicode.key"
+    let spacesKey = "spaces.key"
+    let commentKey = "comment.key"
+    let specialCharsKey = "key-with-special/chars&@#"
+    let formatKey = "format.key"
+    let htmlKey = "html.key"
+    let jsonKey = "json.key"
+    let emptyKey = "empty.key"
+    let emojiKey = "emoji.key"
 }
