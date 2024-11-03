@@ -70,7 +70,7 @@ final class ProgressTracker: ProgressTracking {
         fflush(stdout)
         
         if currentProgress == totalProgress {
-            print("\n\u{001B}[34m\(step) completed.\u{001B}[0m")
+            print("\n\u{001B}[93m\(step) completed.\u{001B}[0m")
         }
     }
 }
@@ -100,13 +100,13 @@ final class FileScanner: FileScanning {
             try findFileUrls(at: path)
             findUnusedKeys()
         } catch {
-            print("❌ Error scanning files: \(error.localizedDescription)")
+            print("Error scanning files: \(error.localizedDescription)")
             throw error
         }
     }
 
     private func findFileUrls(at path: String) throws {
-        print("\n🔍 \u{001B}[34mSearching for Localization Keys in .strings files...\u{001B}[0m")
+        print("\n\u{001B}[93mSearching for Localization Keys in .strings files...\u{001B}[0m")
         let fileManager = FileManager.default
         let enumerator = fileManager.enumerator(
             at: URL(fileURLWithPath: path),
@@ -130,17 +130,17 @@ final class FileScanner: FileScanning {
             }
         }
         
-        print("\n\u{001B}[34mFound .strings file paths:\u{001B}[0m")
+        print("\n\u{001B}[93mFound .strings file paths:\u{001B}[0m")
         for path in stringsFilePaths {
             print("\(path)")
         }
     }
     
     private func findUnusedKeys() {
-        print("\n🔍 \u{001B}[34mSearching for unused keys...\u{001B}[0m")
+        print("\n\u{001B}[93mSearching for unused keys...\u{001B}[0m")
         
-        print("\n📊 \u{001B}[34mTotal \u{001B}[32m\(localizationKeys.count)\u{001B}[34m localization keys found.\u{001B}[0m")
-        print("\n📱 \u{001B}[34mTotal \u{001B}[32m\(swiftFileUrls.count)\u{001B}[34m swift files found.\u{001B}[0m")
+        print("\n\u{001B}[93mTotal \u{001B}[32m\(localizationKeys.count)\u{001B}[93m localization keys found.\u{001B}[0m")
+        print("\n\u{001B}[93mTotal \u{001B}[32m\(swiftFileUrls.count)\u{001B}[93m swift files found.\u{001B}[0m")
 
         let startTime = Date()
         var currentFile = 0
@@ -170,11 +170,11 @@ final class FileScanner: FileScanning {
                 fflush(stdout)
                 
             } catch {
-                print("\n⚠️ Could not read file: \(fileURL.lastPathComponent)")
+                print("\nCould not read file: \(fileURL.lastPathComponent)")
             }
         }
         
-        print("\n\n📝 \u{001B}[34mUnused Localization Keys:\u{001B}[0m")
+        print("\n\n\u{001B}[93mUnused Localization Keys:\u{001B}[0m")
 
         var unusedKeysByFile: [String: [LocalizationKey]] = [:]
         
@@ -194,7 +194,7 @@ final class FileScanner: FileScanning {
         }
         
         let totalUnusedKeys = unusedKeysByFile.values.map { $0.count }.reduce(0, +)
-        print("\n📊 \u{001B}[34mTotal \u{001B}[31m\(totalUnusedKeys)\u{001B}[34m unused localization keys found.\u{001B}[0m")
+        print("\n\u{001B}[93mTotal \u{001B}[31m\(totalUnusedKeys)\u{001B}[93m unused localization keys found.\u{001B}[0m")
     }
 }
 
@@ -352,7 +352,7 @@ final class LocalizationAnalyzer {
         }
 
         let totalTime = Date().timeIntervalSince(startTime ?? Date())
-        print("\n\u{001B}[34m🎉 Completed in:\u{001B}[0m \u{001B}[32m\(String(format: "%.1f", totalTime))s\u{001B}[0m")
+        print("\n\u{001B}[93mCompleted in:\u{001B}[0m \u{001B}[32m\(String(format: "%.1f", totalTime))s\u{001B}[0m")
     }
 }
 
