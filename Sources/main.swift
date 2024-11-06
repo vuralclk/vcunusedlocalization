@@ -3,7 +3,8 @@ import Foundation
 import SwiftSyntax
 import SwiftParser
 
-struct VCUnusedLocalization: ParsableCommand {
+@available(macOS 10.15, macCatalyst 13, iOS 13, tvOS 13, watchOS 6, *)
+struct VCUnusedLocalization: AsyncParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "vcunusedlocalization", 
         abstract: "Scans all files in the project to detect unused localization keys",
@@ -11,7 +12,8 @@ struct VCUnusedLocalization: ParsableCommand {
     )
 }
 
-struct ScanCommand: ParsableCommand {
+@available(macOS 10.15, macCatalyst 13, iOS 13, tvOS 13, watchOS 6, *)
+struct ScanCommand: AsyncParsableCommand {
     static var configuration = CommandConfiguration(
         commandName: "scan",
         abstract: "Scans all files in the project to detect unused localization keys"
@@ -20,7 +22,7 @@ struct ScanCommand: ParsableCommand {
     @Option(name: .shortAndLong, help: "Project directory path")
     var path: String = FileManager.default.currentDirectoryPath
 
-    func run() throws {
+    func run() async throws {
         do {
             let progressTracker = ProgressTracker()
             let localizationParser = LocalizationParser(
@@ -34,7 +36,7 @@ struct ScanCommand: ParsableCommand {
                 fileScanner: fileScanner,
                 progressTracker: progressTracker
             )
-            try analyzer.analyzeProject(at: path)
+            try await analyzer.analyzeProject(at: path)
         } catch {
             print("Error: \(error.localizedDescription)")
             throw error
@@ -76,10 +78,10 @@ final class ProgressTracker: ProgressTracking {
 }
 
 protocol FileScanning {
-    func scan(at path: String) throws
+    func scan(at path: String) async throws
 }
 
-final class FileScanner: FileScanning {
+actor FileScanner: FileScanning {
     private let progressTracker: ProgressTracking
     private let localizationParser: LocalizationParsing
 
@@ -95,17 +97,17 @@ final class FileScanner: FileScanning {
         self.localizationParser = localizationParser
     }
 
-    func scan(at path: String) throws {
+    func scan(at path: String) async throws {
         do {
-            try findFileUrls(at: path)
-            findUnusedKeys()
+            try await findFileUrls(at: path)
+            await findUnusedKeys()
         } catch {
             print("Error scanning files: \(error.localizedDescription)")
             throw error
         }
     }
 
-    private func findFileUrls(at path: String) throws {
+    private func findFileUrls(at path: String) async throws {
         print("\n\u{001B}[93mSearching for Localization Keys in .strings files...\u{001B}[0m")
         let fileManager = FileManager.default
         let enumerator = fileManager.enumerator(
@@ -136,44 +138,97 @@ final class FileScanner: FileScanning {
         }
     }
     
-    private func findUnusedKeys() {
+    private func findUnusedKeys() async {
         print("\n\u{001B}[93mSearching for unused keys...\u{001B}[0m")
         
         print("\n\u{001B}[93mTotal \u{001B}[32m\(localizationKeys.count)\u{001B}[93m localization keys found.\u{001B}[0m")
         print("\n\u{001B}[93mTotal \u{001B}[32m\(swiftFileUrls.count)\u{001B}[93m swift files found.\u{001B}[0m")
 
-        let startTime = Date()
-        var currentFile = 0
         let totalFiles = swiftFileUrls.count
-        var lastUpdateTime = Date()
-        var averageTimePerFile: TimeInterval = 0
-        
-        for fileURL in swiftFileUrls {
-            currentFile += 1
-            do {
-                let sourceFile = try Parser.parse(source: String(contentsOf: fileURL, encoding: .utf8))
-                let visitor = StringLiteralVisitor(viewMode: .sourceAccurate)
-                visitor.walk(sourceFile)                
-                stringLiterals.formUnion(visitor.stringLiterals)
 
-                let currentTime = Date()
-                let elapsedTime = currentTime.timeIntervalSince(lastUpdateTime)
-                lastUpdateTime = currentTime
-                
-                averageTimePerFile = (averageTimePerFile * Double(currentFile - 1) + elapsedTime) / Double(currentFile)
-                
-                let remainingFiles = totalFiles - currentFile
-                let estimatedRemainingTime = averageTimePerFile * Double(remainingFiles)
-                
-                let progress = Double(currentFile) / Double(totalFiles)
-                print("\rScanning file \(currentFile)/\(totalFiles) (%\(Int(progress * 100)))... Estimated time remaining: \(Int(estimatedRemainingTime))s", terminator: "")
-                fflush(stdout)
-                
-            } catch {
-                print("\nCould not read file: \(fileURL.lastPathComponent)")
+        actor VisitorActor {
+            private var currentFile = 0
+            private var lastUpdateTime = Date()
+            private var averageTimePerFile: TimeInterval = 0
+            
+            func getCurrentFile() -> Int {
+                return currentFile
+            }
+            
+            func incrementCurrentFile() {
+                currentFile += 1
+            }
+            
+            func getLastUpdateTime() -> Date {
+                return lastUpdateTime
+            }
+            
+            func setLastUpdateTime(_ value: Date) {
+                lastUpdateTime = value
+            }
+            
+            func getAverageTimePerFile() -> TimeInterval {
+                return averageTimePerFile
+            }
+            
+            func setAverageTimePerFile(_ value: TimeInterval) {
+                averageTimePerFile = value
             }
         }
-        
+
+        let visitorActor = VisitorActor()
+        var allStringLiterals = Set<String>()
+
+        await withTaskGroup(of: Set<String>.self) { group in
+            for fileURL in swiftFileUrls {
+                group.addTask {
+                    await visitorActor.incrementCurrentFile()
+                    do {
+                        let sourceFile = try Parser.parse(source: String(contentsOf: fileURL, encoding: .utf8))
+                        let visitor = StringLiteralVisitor(viewMode: .sourceAccurate)
+                        visitor.walk(sourceFile)
+                        let literals = visitor.stringLiterals
+
+                        let currentTime = Date()
+                        let lastUpdateTime = await visitorActor.getLastUpdateTime()
+                        let elapsedTime = currentTime.timeIntervalSince(lastUpdateTime)
+                        await visitorActor.setLastUpdateTime(currentTime)
+
+                        let currentFile = await visitorActor.getCurrentFile()
+                        let averageTimePerFile = await visitorActor.getAverageTimePerFile()
+                        await visitorActor.setAverageTimePerFile(
+                            (
+                                averageTimePerFile * Double(
+                                    currentFile - 1
+                                ) + elapsedTime
+                            ) / Double(
+                                currentFile
+                            )
+                        )
+
+                        let remainingFiles = totalFiles - currentFile
+                        let estimatedRemainingTime = averageTimePerFile * Double(remainingFiles)
+
+                        let progress = Double(currentFile) / Double(totalFiles)
+                        print("\rScanning file \(currentFile)/\(totalFiles) (%\(Int(progress * 100)))... Estimated time remaining: \(Int(estimatedRemainingTime))s", terminator: "")
+                        fflush(stdout)
+
+                        return literals
+
+                    } catch {
+                        print("\nCould not read file: \(fileURL.lastPathComponent)")
+                        return []
+                    }
+                }
+            }
+
+            for await literals in group {
+                allStringLiterals.formUnion(literals)
+            }
+        }
+
+        stringLiterals = allStringLiterals
+
         print("\n\n\u{001B}[93mUnused Localization Keys:\u{001B}[0m")
 
         var unusedKeysByFile: [String: [LocalizationKey]] = [:]
@@ -341,11 +396,11 @@ final class LocalizationAnalyzer {
         self.progressTracker = progressTracker
     }
     
-    func analyzeProject(at path: String) throws {
+    func analyzeProject(at path: String) async throws {
         startTime = Date()
 
         do {
-            try fileScanner.scan(at: path)
+            try await fileScanner.scan(at: path)
         } catch {
             print("Error analyzing project: \(error.localizedDescription)")
             throw error
@@ -355,5 +410,3 @@ final class LocalizationAnalyzer {
         print("\n\u{001B}[93mCompleted in:\u{001B}[0m \u{001B}[32m\(String(format: "%.1f", totalTime))s\u{001B}[0m")
     }
 }
-
-VCUnusedLocalization.main()
