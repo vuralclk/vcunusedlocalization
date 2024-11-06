@@ -3,6 +3,7 @@ import Foundation
 import SwiftSyntax
 import SwiftParser
 
+@main
 @available(macOS 10.15, macCatalyst 13, iOS 13, tvOS 13, watchOS 6, *)
 struct VCUnusedLocalization: AsyncParsableCommand {
     static var configuration = CommandConfiguration(
@@ -36,6 +37,7 @@ struct ScanCommand: AsyncParsableCommand {
                 fileScanner: fileScanner,
                 progressTracker: progressTracker
             )
+            print("Run worked")
             try await analyzer.analyzeProject(at: path)
         } catch {
             print("Error: \(error.localizedDescription)")
@@ -115,21 +117,66 @@ actor FileScanner: FileScanning {
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles]
         )
-        
-        var stringsFilePaths: [String] = []
-        
-        while let fileURL = enumerator?.nextObject() as? URL {
-            if fileURL.pathExtension.lowercased() == "strings" && fileURL.path.contains("InfoPlist.strings") == false && fileURL.path.contains("Pods") == false {
-                stringsFilePaths.append(fileURL.path)
-                do {
-                    let keys = try self.localizationParser.parseStringsFile(at: fileURL)
-                    self.localizationKeys.formUnion(keys)
-                } catch {
-                    print("Error: \(error.localizedDescription)")
-                }
-            } else if fileURL.pathExtension.lowercased() == "swift" {
-                swiftFileUrls.insert(fileURL)
+
+        var stringsFilePaths = [String]()
+        var localizationKeys = Set<LocalizationKey>()
+
+        struct ReturnType: Sendable {
+            let stringsFilePath: String?
+            let localizationKeys: Set<LocalizationKey>?
+            let swiftFileUrl: URL?
+
+            init(
+                stringsFilePath: String? = nil,
+                localizationKeys: Set<LocalizationKey>? = nil,
+                swiftFileUrl: URL? = nil
+            ) {
+                self.stringsFilePath = stringsFilePath
+                self.localizationKeys = localizationKeys
+                self.swiftFileUrl = swiftFileUrl
             }
+        }
+
+        await withTaskGroup(of: ReturnType.self) { group in
+            while let fileURL = enumerator?.nextObject() as? URL {
+                group.addTask {
+                    if fileURL.pathExtension.lowercased() == "strings",
+                       fileURL.path.contains("InfoPlist.strings") == false,
+                       fileURL.path.contains("Pods") == false {
+                        do {
+                            let keys = try await self.localizationParser.parseStringsFile(at: fileURL)
+                            return .init(
+                                stringsFilePath: fileURL.path,
+                                localizationKeys: keys,
+                                swiftFileUrl: nil
+                            )
+                        } catch {
+                            print("Error: \(error.localizedDescription)")
+                        }
+                    } else if fileURL.pathExtension.lowercased() == "swift" {
+                        return .init(
+                            stringsFilePath: nil,
+                            localizationKeys: nil,
+                            swiftFileUrl: fileURL
+                        )
+                    } else {
+                        return .init()
+                    }
+                    return  .init()
+                }
+            }
+
+            for await returnType in group {
+                if let localizationKeys = returnType.localizationKeys {
+                    self.localizationKeys.formUnion(localizationKeys)
+                }
+
+                if let swiftFileUrl = returnType.swiftFileUrl {
+                    self.swiftFileUrls.insert(swiftFileUrl)
+                }
+            }
+
+            await group.waitForAll()
         }
         
         print("\n\u{001B}[93mFound .strings file paths:\u{001B}[0m")
@@ -267,7 +314,7 @@ class StringLiteralVisitor: SyntaxVisitor {
 }
 
 protocol LocalizationParsing {
-    func parseStringsFile(at url: URL) throws -> Set<LocalizationKey>
+    func parseStringsFile(at url: URL) async throws -> Set<LocalizationKey>
 }
 
 class LocalizationKey: Hashable {
@@ -337,7 +384,7 @@ final class LocalizationParser: LocalizationParsing {
         self.progressTracker = progressTracker
     }
 
-    func parseStringsFile(at url: URL) throws -> Set<LocalizationKey> {
+    func parseStringsFile(at url: URL) async throws -> Set<LocalizationKey> {
         var content: String? = nil
         let encodings: [String.Encoding] = [
             .utf8,
