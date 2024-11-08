@@ -37,7 +37,6 @@ struct ScanCommand: AsyncParsableCommand {
                 fileScanner: fileScanner,
                 progressTracker: progressTracker
             )
-            print("Run worked")
             try await analyzer.analyzeProject(at: path)
         } catch {
             print("Error: \(error.localizedDescription)")
@@ -139,7 +138,7 @@ actor FileScanner: FileScanning {
 
         await withTaskGroup(of: ReturnType.self) { group in
             while let fileURL = enumerator?.nextObject() as? URL {
-                group.addTask {
+                group.addTask(priority: .userInitiated) {
                     if fileURL.pathExtension.lowercased() == "strings",
                        fileURL.path.contains("InfoPlist.strings") == false,
                        fileURL.path.contains("Pods") == false {
@@ -193,74 +192,16 @@ actor FileScanner: FileScanning {
 
         let totalFiles = swiftFileUrls.count
 
-        actor VisitorActor {
-            private var currentFile = 0
-            private var lastUpdateTime = Date()
-            private var averageTimePerFile: TimeInterval = 0
-            
-            func getCurrentFile() -> Int {
-                return currentFile
-            }
-            
-            func incrementCurrentFile() {
-                currentFile += 1
-            }
-            
-            func getLastUpdateTime() -> Date {
-                return lastUpdateTime
-            }
-            
-            func setLastUpdateTime(_ value: Date) {
-                lastUpdateTime = value
-            }
-            
-            func getAverageTimePerFile() -> TimeInterval {
-                return averageTimePerFile
-            }
-            
-            func setAverageTimePerFile(_ value: TimeInterval) {
-                averageTimePerFile = value
-            }
-        }
-
-        let visitorActor = VisitorActor()
         var allStringLiterals = Set<String>()
 
         await withTaskGroup(of: Set<String>.self) { group in
             for fileURL in swiftFileUrls {
-                group.addTask {
-                    await visitorActor.incrementCurrentFile()
+                group.addTask(priority: .userInitiated) {
                     do {
                         let sourceFile = try Parser.parse(source: String(contentsOf: fileURL, encoding: .utf8))
                         let visitor = StringLiteralVisitor(viewMode: .sourceAccurate)
                         visitor.walk(sourceFile)
-                        let literals = visitor.stringLiterals
-
-                        let currentTime = Date()
-                        let lastUpdateTime = await visitorActor.getLastUpdateTime()
-                        let elapsedTime = currentTime.timeIntervalSince(lastUpdateTime)
-                        await visitorActor.setLastUpdateTime(currentTime)
-
-                        let currentFile = await visitorActor.getCurrentFile()
-                        let averageTimePerFile = await visitorActor.getAverageTimePerFile()
-                        await visitorActor.setAverageTimePerFile(
-                            (
-                                averageTimePerFile * Double(
-                                    currentFile - 1
-                                ) + elapsedTime
-                            ) / Double(
-                                currentFile
-                            )
-                        )
-
-                        let remainingFiles = totalFiles - currentFile
-                        let estimatedRemainingTime = averageTimePerFile * Double(remainingFiles)
-
-                        let progress = Double(currentFile) / Double(totalFiles)
-                        print("\rScanning file \(currentFile)/\(totalFiles) (%\(Int(progress * 100)))... Estimated time remaining: \(Int(estimatedRemainingTime))s", terminator: "")
-                        fflush(stdout)
-
-                        return literals
+                        return visitor.stringLiterals
 
                     } catch {
                         print("\nCould not read file: \(fileURL.lastPathComponent)")
@@ -278,25 +219,16 @@ actor FileScanner: FileScanning {
 
         print("\n\n\u{001B}[93mUnused Localization Keys:\u{001B}[0m")
 
-        var unusedKeysByFile: [String: [LocalizationKey]] = [:]
-        
-        for key in localizationKeys {
-            if !stringLiterals.contains(key.key) {
-                if unusedKeysByFile[key.file] == nil {
-                    unusedKeysByFile[key.file] = []
-                }
-                unusedKeysByFile[key.file]?.append(key)
+        var unusedKeyCount = 0
+
+        localizationKeys.forEach {
+            if stringLiterals.contains($0.key) == false {
+                print("Unused Key: \u{001B}[31m\($0.key)\u{001B}[0m")
+                unusedKeyCount += 1
             }
         }
-        
-        for (file, keys) in unusedKeysByFile {
-            for key in keys {
-                print("File: \u{001B}[31m\(file)\u{001B}[0m -> Unused Key: \u{001B}[31m\(key.key)\u{001B}[0m")
-            }
-        }
-        
-        let totalUnusedKeys = unusedKeysByFile.values.map { $0.count }.reduce(0, +)
-        print("\n\u{001B}[93mTotal \u{001B}[31m\(totalUnusedKeys)\u{001B}[93m unused localization keys found.\u{001B}[0m")
+
+        print("\n\u{001B}[93mTotal \u{001B}[31m\(unusedKeyCount)\u{001B}[93m unused localization keys found.\u{001B}[0m")
     }
 }
 
@@ -327,19 +259,13 @@ class LocalizationKey: Hashable {
     }
 
     let key: String
-    let file: String
-    let lineNumber: Int
     var isUsed: Bool
 
     init(
         key: String,
-        file: String,
-        lineNumber: Int,
         isUsed: Bool
     ) {
         self.key = key
-        self.file = file
-        self.lineNumber = lineNumber
         self.isUsed = isUsed
     }
 }
@@ -410,17 +336,11 @@ final class LocalizationParser: LocalizationParsing {
 
         var localizationKeys = Set<LocalizationKey>()
 
-        for (index, match) in matches.enumerated() {
+        for (_, match) in matches.enumerated() {
             if let keyRange = Range(match.range(at: 1), in: content) {
                 let key = String(content[keyRange])
-                let lineNumber = content.prefix(through: content.index(content.startIndex, offsetBy: match.range.location))
-                    .components(separatedBy: .newlines)
-                    .count
-
                 localizationKeys.insert(LocalizationKey(
                     key: key,
-                    file: url.lastPathComponent,
-                    lineNumber: lineNumber,
                     isUsed: false
                 ))
             }
