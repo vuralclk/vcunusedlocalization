@@ -1,54 +1,63 @@
 import Foundation
 
 protocol LocalizationParsing {
+    /// Parses a .strings file at the given URL and returns a set of localization keys.
+    /// - Parameter url: The URL of the .strings file.
+    /// - Returns: A set of localization keys extracted from the file.
     func parseStringsFile(
         at url: URL
     ) async throws -> Set<LocalizationKey>
 }
 
 extension LocalizationParser {
+    /// A regular expression pattern to capture localization keys and their values in .strings files.
+    /// This pattern captures keys and values in the form "key" = "value"; while supporting escaped characters.
     private static let absoluteKeyPattern = #"""
-        (?<!\\)"                           # Başlangıç tırnak işareti (escape edilmemiş)
-        (                                  # Key yakalama grubu başlangıcı
-            [^"\\]*                       # Tırnak veya slash olmayan karakterler
+        (?<!\\)"                           # Starting quotation mark (not escaped)
+        (                                  # Beginning of the key capture group
+            [^"\\]*                       # Any character that is not a quotation mark or backslash
             (?:
-                \\.                       # Escape edilmiş herhangi bir karakter
-                [^"\\]*                   # Tekrar normal karakterler
+                \\.                       # An escaped character
+                [^"\\]*                   # Followed by any non-quotation/backslash characters
             )*
-        )                                 # Key yakalama grubu sonu
-        "                                 # Bitiş tırnak işareti
-        \s*=\s*                          # Eşittir işareti ve opsiyonel boşluklar
-        "                                 # Değer başlangıç tırnak işareti
+        )                                 # End of the key capture group
+        "                                 # Ending quotation mark for the key
+        \s*=\s*                           # Equal sign with optional spaces around it
+        "                                 # Starting quotation mark for the value
         (?:
-            [^"\\]*                      # Tırnak veya slash olmayan karakterler
+            [^"\\]*                       # Any character that is not a quotation mark or backslash
             (?:
-                \\.                      # Escape edilmiş karakterler
-                [^"\\]*                  # Normal karakterler
+                \\.                      # Escaped characters
+                [^"\\]*                  # Followed by any normal characters
             )*
-            (?:\n[^"\\]*)*              # Çok satırlı değerler için
+            (?:\n[^"\\]*)*               # Support for multi-line values
         )
-        "                                # Değer bitiş tırnak işareti
-        \s*;                             # Noktalı virgül ve opsiyonel boşluklar
+        "                                 # Ending quotation mark for the value
+        \s*;                              # Semicolon with optional spaces after it
         """#
 }
 
 final class LocalizationParser: LocalizationParsing {
-    private enum LocalizationParserError: Error {
-        case couldNotReadFile
-    }
-
     private let consoleLogger: ConsoleLogging
     private let keyPattern: NSRegularExpression
 
+    /// Initializes the LocalizationParser with a console logger and a key pattern.
+    /// - Parameters:
+    ///   - consoleLogger: An instance of a logger to record parsing events.
+    ///   - keyPattern: A regex pattern for extracting localization keys.
     init(
         consoleLogger: ConsoleLogging,
         keyPattern: String = absoluteKeyPattern
     ) async throws {
         self.consoleLogger = consoleLogger
         do {
+            // Compile the regex pattern with options to support multi-line values and whitespace comments.
             self.keyPattern = try NSRegularExpression(
                 pattern: keyPattern,
-                options: [.allowCommentsAndWhitespace, .dotMatchesLineSeparators]
+                options: [
+                    .allowCommentsAndWhitespace,
+                    .dotMatchesLineSeparators
+                ]
             )
         } catch let error {
             await consoleLogger.logError(
@@ -58,12 +67,24 @@ final class LocalizationParser: LocalizationParsing {
         }
     }
 
-    func parseStringsFile(at url: URL) async throws -> Set<LocalizationKey> {
-        let fileContent = try await extractFileContent(at: url)
+    /// Parses a .strings file and extracts localization keys.
+    /// - Parameter url: The URL of the file to parse.
+    /// - Returns: A set of localization keys extracted from the file content.
+    func parseStringsFile(
+        at url: URL
+    ) async throws -> Set<LocalizationKey> {
+        let fileContent = await extractFileContent(at: url)
+
+        guard let fileContent else {
+            return Set<LocalizationKey>()
+        }
 
         return extractLocalizationKeys(using: fileContent)
     }
 
+    /// Uses the regular expression pattern to extract localization keys from file content.
+    /// - Parameter fileContent: The content of the .strings file.
+    /// - Returns: A set of localization keys extracted from the content.
     private func extractLocalizationKeys(
         using fileContent: String
     ) -> Set<LocalizationKey> {
@@ -72,6 +93,7 @@ final class LocalizationParser: LocalizationParsing {
 
         var localizationKeys = Set<LocalizationKey>()
 
+        // Iterate through regex matches to capture keys and insert them into the set.
         matches.forEach { match in
             if let keyRange = Range(match.range(at: 1), in: fileContent) {
                 let key = String(fileContent[keyRange])
@@ -85,7 +107,12 @@ final class LocalizationParser: LocalizationParsing {
         return localizationKeys
     }
 
-    private func extractFileContent(at url: URL) async throws -> String {
+    /// Attempts to read the content of the .strings file at the specified URL, trying multiple encodings.
+    /// - Parameter url: The URL of the file to read.
+    /// - Returns: The file content as a string, or nil if the content couldn't be read.
+    private func extractFileContent(
+        at url: URL
+    ) async -> String? {
         var content: String? = nil
         let encodings: [String.Encoding] = [
             .utf8,
@@ -94,18 +121,12 @@ final class LocalizationParser: LocalizationParsing {
             .utf16LittleEndian
         ]
 
+        // Try reading file content with different encodings until successful.
         for encoding in encodings {
             if let fileContent = try? String(contentsOf: url, encoding: encoding) {
                 content = fileContent
                 break
             }
-        }
-
-        guard let content else {
-            await consoleLogger.logError(
-                text: "Could not read file: \(url.lastPathComponent)"
-            )
-            throw LocalizationParserError.couldNotReadFile
         }
 
         return content
