@@ -1,4 +1,4 @@
 enum PathExtensionType: String {
-    case swift
-    case strings
+  case swift
+  case strings
 }

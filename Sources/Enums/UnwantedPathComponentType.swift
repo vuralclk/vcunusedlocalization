@@ -1,5 +1,5 @@
 enum UnwantedPathComponentType: String {
-    case infoPlist = "InfoPlist.strings"
-    case pods = "Pods"
-    case carthage = "Carthage"
+  case infoPlist = "InfoPlist.strings"
+  case pods = "Pods"
+  case carthage = "Carthage"
 }
