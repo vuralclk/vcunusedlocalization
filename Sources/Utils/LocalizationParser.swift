@@ -37,7 +37,7 @@ extension LocalizationParser {
         """#
 }
 
-final class LocalizationParser: LocalizationParsing {
+final actor LocalizationParser: LocalizationParsing {
     private let consoleLogger: ConsoleLogging
     private let keyPattern: NSRegularExpression
 

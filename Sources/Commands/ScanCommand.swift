@@ -18,10 +18,11 @@ struct ScanCommand: AsyncParsableCommand {
             let localizationParser = try await LocalizationParser(
                 consoleLogger: consoleLogger
             )
+            let fileManagerActor = FileManagerActor()
             let fileScanner = FileScanner(
                 localizationParser: localizationParser,
                 consoleLogger: consoleLogger,
-                fileManager: .default
+                fileManagerActor: fileManagerActor
             )
             let analyzer = ProjectAnalyzer(
                 fileScanner: fileScanner,

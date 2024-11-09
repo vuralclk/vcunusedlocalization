@@ -29,7 +29,7 @@ final actor FileScanner: FileScanning {
 
     private let localizationParser: LocalizationParsing
     private let consoleLogger: ConsoleLogging
-    private let fileManager: FileManager
+    private let fileManagerActor: FileManaging
 
     private var swiftFileUrls = Set<URL>()
     private var localizationKeys = Set<LocalizationKey>()
@@ -38,11 +38,11 @@ final actor FileScanner: FileScanning {
     init(
         localizationParser: LocalizationParsing,
         consoleLogger: ConsoleLogging,
-        fileManager: FileManager
+        fileManagerActor: FileManaging
     ) {
         self.localizationParser = localizationParser
         self.consoleLogger = consoleLogger
-        self.fileManager = fileManager
+        self.fileManagerActor = fileManagerActor
     }
 
     /// Scans files for localization keys and Swift files, then identifies unused keys.
@@ -69,16 +69,12 @@ final actor FileScanner: FileScanning {
             text: "Searching for Localization Keys in .strings files..."
         )
 
-        let enumerator = fileManager.enumerator(
-            at: URL(fileURLWithPath: path),
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        )
+        let fileUrls = try await fileManagerActor.enumerateFiles(at: path)
 
         await withTaskGroup(
             of: ScanFileUrlsTaskGroupModel.self
         ) { group in
-            while let fileUrl = enumerator?.nextObject() as? URL {
+            for fileUrl in fileUrls {
                 group.addTask(priority: .userInitiated) {
                     await self.fileUrlTaskGroupModel(for: fileUrl)
                 }
