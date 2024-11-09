@@ -40,7 +40,7 @@ actor FileScanner: FileScanning {
             try await scanFileUrls(at: path)
             await scanUnusedKeys()
         } catch {
-            consoleLogger.logError(
+            await consoleLogger.logError(
                 prefix: "Error scanning files: ",
                 with: error
             )
@@ -49,7 +49,7 @@ actor FileScanner: FileScanning {
     }
 
     private func scanFileUrls(at path: String) async throws {
-        consoleLogger.logProgress(
+        await consoleLogger.logProgress(
             text: "Searching for Localization Keys in .strings files..."
         )
         let enumerator = fileManager.enumerator(
@@ -57,9 +57,6 @@ actor FileScanner: FileScanning {
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles]
         )
-
-        var stringsFilePaths = [String]()
-        var localizationKeys = Set<LocalizationKey>()
 
         struct ReturnType: Sendable {
             let stringsFilePath: String?
@@ -78,31 +75,35 @@ actor FileScanner: FileScanning {
         }
 
         await withTaskGroup(of: ReturnType.self) { group in
-            while let fileURL = enumerator?.nextObject() as? URL {
+            while let fileUrl = enumerator?.nextObject() as? URL {
                 group.addTask(priority: .userInitiated) {
-                    if fileURL.pathExtension.lowercased() == "strings",
-                       fileURL.path.contains("InfoPlist.strings") == false,
-                       fileURL.path.contains("Pods") == false {
+                    switch true {
+                    case PathExtensionType.strings.rawValue == fileUrl.pathExtension.lowercased(),
+                         fileUrl.path.contains(UnwantedPathComponentType.infoPlist.rawValue) == false,
+                         fileUrl.path.contains(UnwantedPathComponentType.pods.rawValue) == false:
                         do {
-                            let keys = try await self.localizationParser.parseStringsFile(at: fileURL)
+                            let keys = try await self.localizationParser.parseStringsFile(at: fileUrl)
                             return .init(
-                                stringsFilePath: fileURL.path,
+                                stringsFilePath: fileUrl.path,
                                 localizationKeys: keys,
                                 swiftFileUrl: nil
                             )
-                        } catch {
-                            print("Error: \(error.localizedDescription)")
+                        } catch let error {
+                            await self.consoleLogger.logError(
+                                prefix: "Error: ",
+                                with: error
+                            )
+                            return .init()
                         }
-                    } else if fileURL.pathExtension.lowercased() == "swift" {
+                    case PathExtensionType.swift.rawValue == fileUrl.pathExtension.lowercased():
                         return .init(
                             stringsFilePath: nil,
                             localizationKeys: nil,
-                            swiftFileUrl: fileURL
+                            swiftFileUrl: fileUrl
                         )
-                    } else {
+                    default:
                         return .init()
                     }
-                    return  .init()
                 }
             }
 
@@ -119,40 +120,40 @@ actor FileScanner: FileScanning {
     }
 
     private func scanUnusedKeys() async {
-        consoleLogger.logProgress(
+        await consoleLogger.logProgress(
             prefix: "Total",
             count: localizationKeys.count,
             suffix: "localization keys found."
         )
-        consoleLogger.logProgress(
+        await consoleLogger.logProgress(
             prefix: "Total",
             count: swiftFileUrls.count,
             suffix: "swift files found."
         )
-        consoleLogger.logProgress(
+        await consoleLogger.logProgress(
             text: "Searching for unused keys..."
         )
 
         await visitSwiftFiles()
 
-        consoleLogger.logProgress(
+        await consoleLogger.logProgress(
             text: "Unused Localization Keys:"
         )
 
-        logUnusedKeys()
+        await logUnusedKeys()
     }
 
-    private func logUnusedKeys() {
+    private func logUnusedKeys() async {
         var unusedKeyCount = 0
 
-        localizationKeys.forEach {
-            if stringLiterals.contains($0.key) == false {
-                consoleLogger.logKey(text: $0.key)
+        for localizationKey in localizationKeys {
+            if stringLiterals.contains(localizationKey.key) == false {
+                await consoleLogger.logKey(text: localizationKey.key)
                 unusedKeyCount += 1
             }
         }
 
-        consoleLogger.logProgress(
+        await consoleLogger.logProgress(
             prefix: "Total",
             count: unusedKeyCount,
             suffix: "unused localization keys found."
@@ -181,7 +182,7 @@ actor FileScanner: FileScanning {
 
                         return visitor.stringLiterals
                     } catch let error {
-                        self.consoleLogger.logError(
+                        await self.consoleLogger.logError(
                             prefix: "Could not read file:",
                             with: error
                         )

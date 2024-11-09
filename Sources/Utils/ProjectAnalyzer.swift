@@ -25,7 +25,7 @@ final class ProjectAnalyzer {
         do {
             try await fileScanner.scan(at: path)
         } catch {
-            consoleLogger.logKey(
+            await consoleLogger.logKey(
                 text: "Error analyzing project: \(error.localizedDescription)"
             )
             throw ProjectAnalyzer.analyzeFailed
@@ -33,7 +33,7 @@ final class ProjectAnalyzer {
 
         let totalTime = Date().timeIntervalSince(startTime)
 
-        consoleLogger.logProgress(
+        await consoleLogger.logProgress(
             prefix: "Completed in:",
             text: String(format: "%.1f", totalTime),
             suffix: "s"

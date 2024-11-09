@@ -1,6 +1,6 @@
 import Foundation
 
-protocol ConsoleLogging {
+protocol ConsoleLogging: Actor {
     func logError(
         prefix: String,
         with error: Error
@@ -25,7 +25,7 @@ protocol ConsoleLogging {
     func logKey(text: String)
 }
 
-final class ConsoleLogger: ConsoleLogging {
+final actor ConsoleLogger: ConsoleLogging {
     func logError(
         prefix: String,
         with error: Error

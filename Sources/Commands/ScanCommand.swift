@@ -15,7 +15,7 @@ struct ScanCommand: AsyncParsableCommand {
         let consoleLogger = ConsoleLogger()
 
         do {
-            let localizationParser = try LocalizationParser(
+            let localizationParser = try await LocalizationParser(
                 consoleLogger: consoleLogger
             )
             let fileScanner = FileScanner(
@@ -30,7 +30,7 @@ struct ScanCommand: AsyncParsableCommand {
 
             try await analyzer.analyzeProject(at: path)
         } catch {
-            consoleLogger.logError(
+            await consoleLogger.logError(
                 prefix: "Error:",
                 with: error
             )

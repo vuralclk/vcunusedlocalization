@@ -43,7 +43,7 @@ final class LocalizationParser: LocalizationParsing {
     init(
         consoleLogger: ConsoleLogging,
         keyPattern: String = absoluteKeyPattern
-    ) throws {
+    ) async throws {
         self.consoleLogger = consoleLogger
         do {
             self.keyPattern = try NSRegularExpression(
@@ -51,7 +51,7 @@ final class LocalizationParser: LocalizationParsing {
                 options: [.allowCommentsAndWhitespace, .dotMatchesLineSeparators]
             )
         } catch let error {
-            consoleLogger.logError(
+            await consoleLogger.logError(
                 text: "Regex pattern error: \(error.localizedDescription)"
             )
             throw error
@@ -59,7 +59,7 @@ final class LocalizationParser: LocalizationParsing {
     }
 
     func parseStringsFile(at url: URL) async throws -> Set<LocalizationKey> {
-        let fileContent = try extractFileContent(at: url)
+        let fileContent = try await extractFileContent(at: url)
 
         return extractLocalizationKeys(using: fileContent)
     }
@@ -85,7 +85,7 @@ final class LocalizationParser: LocalizationParsing {
         return localizationKeys
     }
 
-    private func extractFileContent(at url: URL) throws -> String {
+    private func extractFileContent(at url: URL) async throws -> String {
         var content: String? = nil
         let encodings: [String.Encoding] = [
             .utf8,
@@ -102,7 +102,7 @@ final class LocalizationParser: LocalizationParsing {
         }
 
         guard let content else {
-            consoleLogger.logError(
+            await consoleLogger.logError(
                 text: "Could not read file: \(url.lastPathComponent)"
             )
             throw LocalizationParserError.couldNotReadFile
