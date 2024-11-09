@@ -25,17 +25,12 @@ struct ScanCommand: AsyncParsableCommand {
 
     func run() async throws {
         do {
-            let progressTracker = ProgressTracker()
-            let localizationParser = LocalizationParser(
-                progressTracker: progressTracker
-            )
+            let localizationParser = LocalizationParser()
             let fileScanner = FileScanner(
-                progressTracker: progressTracker,
                 localizationParser: localizationParser
             )
             let analyzer = LocalizationAnalyzer(
-                fileScanner: fileScanner,
-                progressTracker: progressTracker
+                fileScanner: fileScanner
             )
             try await analyzer.analyzeProject(at: path)
         } catch {
@@ -45,45 +40,11 @@ struct ScanCommand: AsyncParsableCommand {
     }
 }
 
-protocol ProgressTracking {
-    func updateProgress(_ current: Int, total: Int, step: String)
-}
-
-final class ProgressTracker: ProgressTracking {
-    private var currentStep: String = ""
-    private var currentProgress: Int = 0
-    private var totalProgress: Int = 0
-
-    func updateProgress(_ current: Int, total: Int, step: String) {
-        if step != currentStep {
-            currentStep = step
-            currentProgress = 0
-            totalProgress = total
-            print("\n\u{001B}[32m\(step)\u{001B}[0m started...")
-        }
-        
-        currentProgress = current
-        let progress = Float(currentProgress) / Float(totalProgress)
-        let width = 50
-        let filled = Int(Float(width) * progress)
-        let empty = width - filled
-        
-        let bar = String(repeating: "=", count: filled) + String(repeating: " ", count: empty)
-        print("\r\u{001B}[32m\(step)\u{001B}[0m [\(bar)] \u{001B}[35m\(Int(progress * 100))%\u{001B}[0m", terminator: "")
-        fflush(stdout)
-        
-        if currentProgress == totalProgress {
-            print("\n\u{001B}[93m\(step) completed.\u{001B}[0m")
-        }
-    }
-}
-
 protocol FileScanning {
     func scan(at path: String) async throws
 }
 
 actor FileScanner: FileScanning {
-    private let progressTracker: ProgressTracking
     private let localizationParser: LocalizationParsing
 
     private var swiftFileUrls = Set<URL>()
@@ -91,10 +52,8 @@ actor FileScanner: FileScanning {
     private var stringLiterals = Set<String>()
 
     init(
-        progressTracker: ProgressTracking,
         localizationParser: LocalizationParsing
     ) {
-        self.progressTracker = progressTracker
         self.localizationParser = localizationParser
     }
 
@@ -177,18 +136,17 @@ actor FileScanner: FileScanning {
 
             await group.waitForAll()
         }
-        
-        print("\n\u{001B}[93mFound .strings file paths:\u{001B}[0m")
+
         for path in stringsFilePaths {
             print("\(path)")
         }
     }
     
     private func findUnusedKeys() async {
-        print("\n\u{001B}[93mSearching for unused keys...\u{001B}[0m")
-        
         print("\n\u{001B}[93mTotal \u{001B}[32m\(localizationKeys.count)\u{001B}[93m localization keys found.\u{001B}[0m")
         print("\n\u{001B}[93mTotal \u{001B}[32m\(swiftFileUrls.count)\u{001B}[93m swift files found.\u{001B}[0m")
+
+        print("\n\u{001B}[93mSearching for unused keys...\u{001B}[0m")
 
         let totalFiles = swiftFileUrls.count
 
@@ -217,13 +175,13 @@ actor FileScanner: FileScanning {
 
         stringLiterals = allStringLiterals
 
-        print("\n\n\u{001B}[93mUnused Localization Keys:\u{001B}[0m")
+        print("\n\u{001B}[93mUnused Localization Keys:\u{001B}[0m")
 
         var unusedKeyCount = 0
 
         localizationKeys.forEach {
             if stringLiterals.contains($0.key) == false {
-                print("Unused Key: \u{001B}[31m\($0.key)\u{001B}[0m")
+                print("\u{001B}[31m\($0.key)\u{001B}[0m")
                 unusedKeyCount += 1
             }
         }
@@ -304,11 +262,6 @@ final class LocalizationParser: LocalizationParsing {
             exit(1)
         }
     }()
-    private let progressTracker: ProgressTracking
-
-    init(progressTracker: ProgressTracking) {
-        self.progressTracker = progressTracker
-    }
 
     func parseStringsFile(at url: URL) async throws -> Set<LocalizationKey> {
         var content: String? = nil
@@ -352,15 +305,12 @@ final class LocalizationParser: LocalizationParsing {
 
 final class LocalizationAnalyzer {
     private let fileScanner: FileScanning
-    private let progressTracker: ProgressTracking
     private var startTime: Date?
     
     init(
-        fileScanner: FileScanning,
-        progressTracker: ProgressTracking
+        fileScanner: FileScanning
     ) {
         self.fileScanner = fileScanner
-        self.progressTracker = progressTracker
     }
     
     func analyzeProject(at path: String) async throws {
