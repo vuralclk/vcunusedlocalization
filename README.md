@@ -107,7 +107,7 @@ Vural Çelik
 
 - Swift Team for SwiftSyntax
 - Apple for Swift Argument Parser
-- All contributors who have helped with the project
+- Special thanks to [Arif Okuyucu](https://github.com/okuyucuarif) for his valuable support and guidance on this project
 
 ---
 
