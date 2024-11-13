@@ -22,7 +22,7 @@ VCUnusedLocalization is a command-line tool that helps you identify unused local
 You can install VCUnusedLocalization using Homebrew:
 
 ```bash
-brew install vcunusedlocalization
+brew install vuralclk/vcunusedlocalization/vcunusedlocalization
 ```
 
 ### Manual Installation via Building Binary
