@@ -25,10 +25,10 @@ You can install VCUnusedLocalization using Homebrew:
 brew install vcunusedlocalization
 ```
 
-### Swift Package Manager
+### Manual Installation via Building Binary
 
 ```bash
-git clone https://github.com/<YOUR_USERNAME>/VCUnusedLocalization.git
+git clone https://github.com/vuralclk/VCUnusedLocalization.git
 cd VCUnusedLocalization
 swift build -c release
 sudo cp .build/release/VCUnusedLocalization /usr/local/bin/vcunusedlocalization
