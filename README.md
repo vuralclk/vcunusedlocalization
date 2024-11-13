@@ -17,6 +17,14 @@ VCUnusedLocalization is a command-line tool that helps you identify unused local
 
 ## Installation
 
+### Homebrew
+
+You can install VCUnusedLocalization using Homebrew:
+
+```bash
+brew install vcunusedlocalization
+```
+
 ### Swift Package Manager
 
 ```bash
